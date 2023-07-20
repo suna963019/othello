@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>リバーシ</title>
+    <style>
+        body {
+            background-color: rgb(176, 240, 245);
+        }
+
+        #contents {
+            width: 500px;
+            margin: auto;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        form {
+            width: 500px;
+            display: inline-block;
+            margin: 0;
+        }
+
+        form p {
+            margin-left: 20px;
+        }
+
+        #check_turn {
+            text-align: center;
+            background-color: rgb(107, 221, 107);
+            width: 300px;
+            margin: auto;
+            font-size: 200%;
+        }
+
+        #winner {
+            text-align: center;
+            background-color: rgb(107, 221, 107);
+            width: 300px;
+            margin: auto;
+            font-size: 200%;
+            display: none;
+        }
+
+        #submit {
+            float: right;
+            margin-right: 100px;
+        }
+
+        input {
+            margin: 20px 10px;
+        }
+
+        #num_turn {
+            margin: 20px 50px;
+        }
+
+        #button_block {
+            margin: 30px;
+            margin-bottom: 100px;
+        }
+
+        #back {
+            float: left;
+        }
+
+        #back2 {
+            float: left;
+            margin-left: 20px;
+        }
+
+        #reset {
+            float: right;
+        }
+
+
+        table {
+            width: 500px;
+            height: 480px;
+            background-color: white;
+            margin: auto;
+            border: 3px solid black;
+        }
+
+        td {
+            background-color: rgb(95, 224, 95);
+            text-align: center;
+            height: 57px;
+            width: 57px;
+        }
+
+        td:hover {
+            background-color: rgb(176, 240, 245);
+        }
+
+        td p {
+            font-size: 50px;
+            margin: 0;
+            line-height: 57px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="contents">
+        <h1>othello</h1>
+        <form>
+            <h3>設定</h3>
+            <p>何人でプレイしますか？<br>
+                <label><input type="radio" value="0" name="player" checked>0人</label>
+                <label><input type="radio" value="1" name="player">1人</label>
+                <label><input type="radio" value="2" name="player">2人</label>
+            </p>
+            <p>※一人でプレイする場合選択してください<br>
+                <label><input type="radio" value="1" name="turn" checked>先攻（黒）</label>
+                <label><input type="radio" value="2" name="turn">後攻（白）</label>
+            </p>
+            <input type="submit" id="submit" value="決定">
+        </form>
+        <div id="game_table">
+            <p id="num_turn"></p>
+            <p id="check_turn"><span id="turn"></span>のターン</p>
+            <p id="winner">A</p>
+            <div id="button_block">
+                <button id="back">一手戻る</button>
+                <button id="back2">二手戻る</button>
+                <button id="reset" onclick="window.location.reload()">最初から</button>
+            </div>
+            <table>
+                <tbody>
+
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        'use strict';
+        //コピー用　console.log(squares_list)
+
+        //green=0,black=1,white=2
+        let player_check;
+        let turn_check;
+        let stop_roup = false;
+        let starting = false;
+        let onece_end = false;
+
+        let config = document.querySelector("form");
+        config.onsubmit = function (event) {
+            event.preventDefault();
+            player_check = config.elements["player"].value;
+            turn_check = config.elements["turn"].value;
+            //一手前の保存先
+            for (let i = 0; i < squares_list_back.length - turn - 1; i++) {
+                squares_list_back.pop();
+            }
+            if (!onece_end) {
+                console.log("start")
+                starting = true;
+                start();
+            } else {
+                onece_end = false;
+                select_player();
+            }
+
+        }
+        let can_click = true;
+        document.querySelector("#back").onclick = function () {
+            if (can_click) {
+                can_click = false;
+                set_back();
+            }
+        }
+        function set_back() {
+            if (turn - 1 >= 0) {
+                document.querySelector("#check_turn").style.display = "block";
+                document.querySelector("#winner").style.display = "none";
+                starting = true;
+                stop_roup = false;
+                turn -= 1;
+                squares_list = clone(squares_list_back[turn]);
+                for (let i = 0; i < squares_list_back.length - turn; i++) {
+                    squares_list_back.pop();
+                }
+                change_turn();
+                turn -= 1;
+                set_color();
+                reset_table();
+                select_player();
+            }
+        }
+        document.querySelector("#back2").onclick = function () {
+            if (can_click) {
+                can_click = false;
+                set_back2();
+            }
+        }
+
+        function set_back2() {
+            if (turn - 2 >= 0) {
+                document.querySelector("#check_turn").style.display = "block";
+                document.querySelector("#winner").style.display = "none";
+                starting = true;
+                stop_roup = false;
+                turn -= 2;
+                squares_list = clone(squares_list_back[turn]);
+                for (let i = 0; i < squares_list_back.length - turn; i++) {
+                    squares_list_back.pop();
+                }
+                set_color();
+                reset_table();
+                select_player();
+            }
+        }
+        //二次配列で盤面の状態を保持
+        let squares_list = [];
+        let player_turn = 1;
+        let turn = 0;
+        let squares_list_back = [];
+        document.getElementById("turn").textContent = "黒";
+        document.getElementById("num_turn").textContent = `0ターン目`;
+
+        //一次配列で八方向への変化量を入れている
+        let array = [];
+        let row;
+        let col;
+        for (let i = 0; i < 9; i++) {
+            if (i % 3 === 0) {
+                row = i / 3 - 1;
+            }
+            col = i % 3 - 1;
+            if (row === 0 && col === 0) {
+                continue;
+            }
+            array.push([row, col]);
+        }
+
+        const squares = document.querySelector("tbody");
+        let squares_row;
+        let squares_col;
+        //盤面生成
+        for (let i = 0; i < 64; i++) {
+            if (i % 8 === 0) {
+                squares_row = i / 8;
+                squares.insertAdjacentHTML("beforeend", `<tr id="square_tr_${squares_row}"></tr>`);
+                squares_list.push([]);
+            }
+            squares_col = i % 8;
+            squares_list[squares_row].push(0);
+
+            let square_tr = document.getElementById(`square_tr_${squares_row}`);
+            square_tr.insertAdjacentHTML("beforeend", `<td id="square_td_${squares_row}_${squares_col}"><p id="square_p_${squares_row}_${squares_col}">●</p></td>`);
+
+            let td = document.getElementById(`square_td_${squares_row}_${squares_col}`);
+            td.style.background = "rgb(8, 158, 8)";
+            td.onclick = function () {
+                player_move(td);
+            }
+
+            if ((squares_row === 3 && squares_col === 4) || (squares_row === 4 && squares_col === 3)) {
+                //最初の黒
+                let p = document.getElementById(`square_p_${squares_row}_${squares_col}`);
+                change_black(p);
+            }
+            if ((squares_row === 3 && squares_col === 3) || (squares_row === 4 && squares_col === 4)) {
+                //最初の白
+                let p = document.getElementById(`square_p_${squares_row}_${squares_col}`);
+                change_white(p);
+            }
+        }
+
+
+        //関数群
+        //基本関数
+        //ターンの最初の関数
+        function start() {
+            document.getElementById("num_turn").textContent = `${turn}ターン目`;
+            squares_list_back.push(clone(squares_list));
+            //check_end();
+            //盤面をlistに合わせて初期化
+            set_color();
+
+            reset_table();
+
+            select_player();
+        }
+        //ターンの終わりの関数
+        function end() {
+            change_turn();
+            check_end();
+            start();
+        }
+
+        //start属の関数
+        function set_color() {
+            let roal_row;
+            let roal_col;
+            for (let i = 0; i < 64; i++) {
+                if (i % 8 === 0) {
+                    roal_row = i / 8;
+                }
+                roal_col = i % 8;
+                if (squares_list[roal_row][roal_col] === 0) {
+                    document.querySelector(`#square_p_${roal_row}_${roal_col}`).style.display = "none";
+                }
+                if (squares_list[roal_row][roal_col] === 1) {
+                    document.querySelector(`#square_p_${roal_row}_${roal_col}`).style.color = "black";
+                }
+                if (squares_list[roal_row][roal_col] === 2) {
+                    document.querySelector(`#square_p_${roal_row}_${roal_col}`).style.color = "white";
+                }
+                if (squares_list[roal_row][roal_col] === 4) {
+                    document.querySelector(`#square_p_${roal_row}_${roal_col}`).style.display = "none";
+                }
+            }
+        }
+        function reset_table() {
+            let roal_row;
+            let roal_col;
+            for (let i = 0; i < 64; i++) {
+
+                if (i % 8 === 0) {
+                    roal_row = i / 8;
+                }
+                roal_col = i % 8;
+                let num_array = [roal_row, roal_col];
+                if (squares_list[roal_row][roal_col] === 4) {
+                    squares_list[roal_row][roal_col] = 0;
+                }
+                let td = document.getElementById(`square_td_${roal_row}_${roal_col}`);
+                if (squares_list[roal_row][roal_col] !== 0) {
+                    td.style.background = "rgb(8, 158, 8)";
+                    continue;
+                }
+                if (check_duaring_change(num_array)) {
+                    td.style.background = "";
+                    squares_list[roal_row][roal_col] = 4;
+                }
+                if (squares_list[roal_row][roal_col] === 0) {
+                    td.style.background = "rgb(8, 158, 8)";
+                }
+            }
+        }
+        function select_player() {
+            if (player_check === "0") {
+                cpu_move();
+            } else if (player_check === "1") {
+                if (player_turn === Number(turn_check)) {
+                    can_click = true;
+                } else {
+                    setTimeout(cpu_move, 100);
+                }
+            } else if (player_check === "2") {
+                can_click = true;
+            }
+        }
+
+        let cpu_change;
+        function cpu_move() {
+            if (cpu_random_select()) {
+                change_check(cpu_change);
+            } else {
+                win_check();
+            }
+        }
+        function player_move(td) {
+            //要素を座標で取得
+            let td_num = catch_num(td);
+            //要素を変更
+            if (starting) {
+                if (selector_can_change()) {
+                    if (squares_list[td_num[0]][td_num[1]] === 4) {
+                        change_check(td_num);
+                    }
+                } else {
+                    end();
+                }
+            }
+
+
+        }
+        function selector_can_change() {
+            for (const i of squares_list) {
+                if (i.includes(4)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function cpu_random_select() {
+            let roal_row;
+            let roal_col;
+            let count_array = [];
+            let cpu_change_check = false;
+            for (let i = 0; i < 64; i++) {
+                if (i % 8 === 0) {
+                    roal_row = i / 8;
+                }
+                roal_col = i % 8;
+                if (squares_list[roal_row][roal_col] === 4) {
+                    count_array.push([roal_row, roal_col]);
+                    cpu_change_check = true;
+                }
+            }
+            if (cpu_change_check) {
+                cpu_change = count_array[Math.floor(Math.random() * count_array.length)];
+                return true;
+            } else {
+                return false;
+            }
+
+        }
+        //end属の関数
+        function clone(clone_box) {
+            let clone_array = [];
+            for (const i of clone_box) {
+                clone_array.push(i.concat());
+            }
+
+            return clone_array;
+        }
+
+        //check属の関数
+
+        //指定座標に置けるか確認
+        function check_duaring_change(num_array) {
+            let count = 0;
+            if (squares_list[num_array[0]][num_array[1]] === 2 || squares_list[num_array[0]][num_array[1]] === 3) {
+                return false;
+            }
+            while (count < 8) {
+                if (check_duaring_one_rout(num_array[0], num_array[1], count)) {
+                    return true;
+                } else {
+                    count++;
+                }
+            }
+            return false;
+        }
+        //指定座標が指定方向において有効か
+        function check_duaring_one_rout(point_row, point_col, count) {
+            let check = false;
+            while (true) {
+                point_row = Number(point_row) + Number(array[count][0]);
+                point_col = Number(point_col) + Number(array[count][1]);
+                if (point_row < 0 || point_row >= 8 || point_col < 0 || point_col >= 8) {
+                    return false;
+                }
+                let point = squares_list[point_row][point_col];
+                if (point === 0 || point === 4) {
+                    return false;
+
+                } else if (point !== player_turn) {
+                    check = true;
+
+                } else if (point === player_turn) {
+                    if (check) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        function check_end() {
+            let end_check_count = true;
+            let roal_row;
+            let roal_col;
+            for (let i = 0; i < 64; i++) {
+                if (i % 8 === 0) {
+                    roal_row = i / 8;
+                }
+                roal_col = i % 8;
+                if (squares_list[roal_row][roal_col] === 0 || squares_list[roal_row][roal_col] === 4) {
+                    end_check_count = false;
+                    break;
+                }
+            }
+            if (end_check_count) {
+                let count_win_array = count_win();
+                print_win(count_win_array[0], count_win_array[1]);
+            }
+        }
+
+        //change属の関数
+        function change_check(num_array) {
+            let p = document.getElementById(`square_p_${num_array[0]}_${num_array[1]}`)
+            if (squares_list[num_array[0]][num_array[1]] !== 4) {
+                return;
+            }
+
+            if (player_turn === 1) {
+                change_black(p);
+            } else {
+                change_white(p);
+            }
+            change_duaring(num_array);
+        }
+        function change_duaring(num_array) {
+            const point_array = change_duaring_give(num_array);
+            for (let i of point_array) {
+                let point_row = i[0];
+                let point_col = i[1];
+                let p = document.getElementById(`square_p_${i[0]}_${i[1]}`)
+                if (squares_list[point_row][point_col] === 1) {
+                    change_white(p);
+                } else if (squares_list[point_row][point_col] === 2) {
+                    change_black(p);
+                }
+            }
+            win_check();
+        }
+        function change_duaring_give(num_array) {
+            let point_array = [];
+            let end_array = [];
+            let point;
+            let point_row = num_array[0];
+            let point_col = num_array[1];
+            let count = 0;
+            let check = false;
+            while (count < 8) {
+                point_row = Number(point_row) + Number(array[count][0]);
+                point_col = Number(point_col) + Number(array[count][1]);
+                if (point_row < 0 || point_row >= 8 || point_col < 0 || point_col >= 8) {
+                    check = false;
+                    point_array = [];
+                    count++;
+                    point_row = num_array[0];
+                    point_col = num_array[1];
+                    continue;
+                }
+
+                point = squares_list[point_row][point_col];
+                if (point === 0 || point === 4) {
+                    check = false;
+                    point_array = [];
+                    point_row = num_array[0];
+                    point_col = num_array[1];
+                    count++;
+                } else if (point !== player_turn) {
+                    point_array.push([point_row, point_col]);
+                    check = true;
+                } else if (point === player_turn) {
+                    if (check) {
+                        for (const i of point_array) {
+                            end_array.push(i);
+                        }
+                    }
+                    check = false;
+                    point_array = [];
+                    count++;
+                    point_row = num_array[0];
+                    point_col = num_array[1];
+                }
+            }
+            return end_array;
+        }
+        //elelemetを受け取りelementの座標を返す
+        function catch_num(element) {
+            let id = element.id;
+            let id_array = id.split("_");
+            let id_num = [id_array[2], id_array[3]];
+            return id_num;
+        }
+
+        function change_turn() {
+            turn++;
+            if (player_turn === 1) {
+                player_turn = 2;
+            } else {
+                player_turn = 1;
+            }
+            if (player_turn === 1) {
+                document.getElementById("turn").textContent = "黒";
+            } else {
+                document.getElementById("turn").textContent = "白";
+            }
+        }
+        //color属の関数
+        function change_black(p) {
+            p.style.color = "black";
+            p.style.display = "block";
+            let num_array = catch_num(p);
+            squares_list[num_array[0]][num_array[1]] = 1;
+        }
+        function change_white(p) {
+            p.style.color = "white";
+            p.style.display = "block";
+            let num_array = catch_num(p);
+            squares_list[num_array[0]][num_array[1]] = 2;
+        }
+        function change_can_none(p) {
+            p.style.display = "none";
+            let num_array = catch_num(p);
+            squares_list[num_array[0]][num_array[1]] = 4;
+        }
+        function change_cant_none(p) {
+            p.style.display = "none";
+            let num_array = catch_num(p);
+            squares_list[num_array[0]][num_array[1]] = 0;
+        }
+        //win属の関数
+        function win_check() {
+            if (win_end()) {
+                let count_win_array = count_win();
+                print_win(count_win_array[0], count_win_array[1]);
+            } else {
+                end();
+            }
+        }
+        function win_end() {
+            let roal_row;
+            let roal_col;
+            for (let i = 0; i < 64; i++) {
+                if (i % 8 === 0) {
+                    roal_row = i / 8;
+                }
+                roal_col = i % 8;
+                if (squares_list[roal_row][roal_col] === 4) {
+                    stop_roup = false;
+                    return false;
+                }
+            }
+            if (stop_roup) {
+                return true;
+            }
+            stop_roup = true;
+            return false;
+        }
+        function count_win() {
+            let roal_row;
+            let roal_col;
+            let black_count = 0;
+            let white_count = 0;
+            for (let i = 0; i < 64; i++) {
+                if (i % 8 === 0) {
+                    roal_row = i / 8;
+                }
+                roal_col = i % 8;
+                if (squares_list[roal_row][roal_col] === 1) {
+                    black_count++;
+                }
+                if (squares_list[roal_row][roal_col] === 2) {
+                    white_count++;
+                }
+            }
+            return [black_count, white_count];
+        }
+        function print_win(black_count, white_count) {
+            reset_table();
+            starting = false;
+            onece_end = true;
+            document.querySelector("#check_turn").style.display = "none";
+            let winner = document.querySelector("#winner");
+            winner.style.display = "block";
+            if (black_count === white_count) {
+                winner.textContent = "引き分け";
+                winner.style.color = "gray";
+            } else if (black_count > white_count) {
+                winner.textContent = "黒の勝ち";
+                winner.style.backgroundColor = "white";
+            } else {
+                winner.textContent = "白の勝ち";
+                winner.style.color = "white";
+                winner.style.backgroundColor = "black";
+            }
+        }
+    </script>
+</body>
+
+</html>
